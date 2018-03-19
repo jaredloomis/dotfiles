@@ -1,3 +1,8 @@
+{-
+Ideas/TODO:
+- Create simple declarative "conky script creation API" to avoid string programming
+- Don't reference home dir
+-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE FlexibleContexts #-}
 import XMonad hiding ((|||))
@@ -44,7 +49,7 @@ myWorkspaces =
     clickable :: [String] -> [String]
     clickable labels =
         [
-        "^ca(1,xdotool key alt+"++show i++")"++label++"^ca()"
+        "^ca(1,xdotool key super+"++show i++")"++label++"^ca()"
             | (i, label) <- zip [(1::Int)..] labels
         ]
 
@@ -67,8 +72,8 @@ myKeys =
     ((myModMask, xK_b ), sendMessage ToggleStruts),
 
     -- Volume control.
-    ((myModMask, xK_u), spawn "amixer set Master 2+"),
-    ((myModMask, xK_y), spawn "amixer set Master 2-"),
+    ((myModMask, xK_u), spawn "amixer -D pulse set Master 2%+"),
+    ((myModMask, xK_y), spawn "amixer -D pulse set Master 2%-"),
 
     -- Vertical Resize ResizableTall windows.
     -- !!! These Override default keys !!!
@@ -251,28 +256,42 @@ conkyConfig =
 
     -- Begin content.
     "TEXT\n" ++
-    "^i(" ++ homeDir ++ "/.xmonad/icons/images/spkr_01.xbm)  " ++
 
     -- Volume display.
-    "^fg(\\#0055FF)${exec amixer get Master " ++
-    "| grep \"Mono: Playback\" | egrep -o \"[0-9]+%\"}  " ++
+    "^i(" ++ homeDir ++ "/.xmonad/icons/images/spkr_01.xbm)  " ++
+    "^fg(\\#0055FF)${exec amixer -D pulse get Master | " ++
+    "egrep -o [0-9]+% | head -n1}  " ++
 
-    -- CPU usage display.
+{-
+    -- Full Per-Core CPU usage display.
     "^fg()|  ^i(" ++ homeDir ++ "/.xmonad/icons/images/cpu.xbm)  " ++
     "^fg(\\#FF0055)${cpu cpu1}% ${cpu cpu2}% " ++
-    "${cpu cpu3}% ${cpu cpu4}%^fg()  |  " ++
+    "${cpu cpu3}% ${cpu cpu4}% ${cpu cpu5}% ${cpu cpu6}% ${cpu cpu7}% ${cpu cpu8}%^fg()  |  " ++
+-}
+
+    -- Summary CPU usage display.
+    "^fg()|  ^i(" ++ homeDir ++ "/.xmonad/icons/images/cpu.xbm)  " ++
+    "^fg(\\#FF0055)${cpu}%^fg()  |  " ++
 
     -- RAM usage display.
     "^i(" ++ homeDir ++ "/.xmonad/icons/images/mem.xbm)  " ++
     "^fg(\\#55FF00)${mem} ^fg()  |  " ++
 
-    -- GPU usage display. I am using an AMD GPU.
+    -- GPU usage display. I am using an AMD GPU. TODO fix use open source driver
+    {-
     "^i(" ++ homeDir ++ "/.xmonad/icons/images/pacman.xbm)  " ++
     "^fg(\\#D4FF00)${exec aticonfig --odgc --adapter=0" ++
     " | grep \"GPU load\" | egrep -o \"[0-9]+%\"}" ++
+    "^fg()  | " ++
+    -}
+
+    -- CPU temp display.
+    "^i(" ++ homeDir ++ "/.xmonad/icons/images/temp.xbm)  " ++
+    "^fg(\\#FF0055)${exec sensors | grep temp1 | egrep -o \"[0-9.]+°C\" " ++
+    "| head -n1} ^fg()  |  " ++
 
     -- Time display.
-    "^fg()  |  ^i(" ++ homeDir ++ "/.xmonad/icons/stlarch/clock1.xbm)  " ++
+    "^i(" ++ homeDir ++ "/.xmonad/icons/stlarch/clock1.xbm)  " ++
     "^fg(\\#0055FF)${time %l:%M %p}" ++
     "\n"
 
@@ -294,8 +313,7 @@ comptonStart = spawn $ "compton --config " ++ homeDir ++ "/.compton.conf"
 
 -- | Set wallpaper.
 setWallpaper :: FilePath -> IO ()
-setWallpaper file =
-        spawn $ "feh --bg-fill \""++file++"\""
+setWallpaper file = spawn $ "feh --bg-fill \""++file++"\""
 
 ----------
 -- Main --

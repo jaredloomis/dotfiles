@@ -1,6 +1,12 @@
 #!/bin/bash
-export BROWSER=chromium
-export DE=xmonad
+
+# Set web browser
+export BROWSER=firefox-nightly
+
+# Set desktop environment if not already set
+if [ -z "$DE" ]; then
+    export DE=xmonad
+fi
 
 # Dbus fix
 if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
@@ -13,20 +19,24 @@ export GTK2_RC_FILES="$HOME/.gtkrc-2.0"
 # Load settings in .Xresources.
 xrdb "$HOME/.Xresources"
 
-# Set power saving settings.
-#xset s blank
+# Set monitor power saving settings.
 xset s 3600
-#xset dpms 
 
 # Set XCompose to use right windows key.
 setxkbmap -option "compose:rwin"
 
-### Xfce ###
-#exec startxfce4
+### Start WM/DE ###
 
-### XMonad ###
-# Set left pointer as default cursor.
-xsetroot -cursor_name left_ptr
-# Start XMonad.
-exec xmonad
-#exec xmonad | dzen2
+# Lowercase DE string for comparison
+DE_LC=$(echo "$DE" | tr '[:upper:]' '[:lower:]')
+
+# Xfce
+if [[ $DE_LC == *"xfce"* ]]; then
+    exec startxfce4
+else # XMonad is default
+    # Set left pointer as default cursor.
+    xsetroot -cursor_name left_ptr
+    # Set resolution (doesn't appear to do anything; remove)
+    #xrandr -s 1920x1080
+    exec xmonad
+fi
