@@ -1,24 +1,26 @@
+{-
+Ideas/TODO:
+- Create simple declarative "conky script creation API" to avoid string programming
+- Don't reference home dir
+-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE FlexibleContexts #-}
 import XMonad hiding ((|||))
 import XMonad.Hooks.DynamicLog
 import XMonad.Hooks.ManageDocks
+import XMonad.Hooks.SetWMName
+
 import XMonad.Layout.LayoutCombinators
 import XMonad.Layout.ResizableTile
-import XMonad.Layout.TwoPane
-import XMonad.Layout.Renamed
-import XMonad.Layout.ComboP
 import XMonad.Layout.Master
-import XMonad.Layout.LayoutBuilder
-import XMonad.Layout.Combo
 import XMonad.Layout.Tabbed
+
 import qualified XMonad.StackSet as W
 import XMonad.Util.Run (spawnPipe)
 import XMonad.Util.EZConfig
     (additionalKeys, additionalMouseBindings)
 import System.IO (Handle, hPutStrLn, hPutStr)
 import Data.Monoid (Endo, All)
---import Data.Char (isDigit)
---import Data.List
 
 --------------------
 -- Basic Settings --
@@ -28,11 +30,12 @@ homeDir :: String
 homeDir = "/home/fiendfan1"
 
 myTerminal :: String
-myTerminal = "xterm"
+myTerminal = "terminator"
 
 myBorderWidth :: Dimension
 myBorderWidth = 1
 
+-- | mod4 is Windows key
 myModMask :: KeyMask
 myModMask = mod4Mask
 
@@ -40,15 +43,23 @@ myFocusFollowsMouse :: Bool
 myFocusFollowsMouse = True
  
 myWorkspaces :: [String]
-myWorkspaces = ["Main"]
+myWorkspaces =
+    clickable . map dzenEscape $ ["1 Development", "2 Web", "3 Music", "4", "5"]
+  where
+    clickable :: [String] -> [String]
+    clickable labels =
+        [
+        "^ca(1,xdotool key super+"++show i++")"++label++"^ca()"
+            | (i, label) <- zip [(1::Int)..] labels
+        ]
 
 myNormalBorderColor :: String
-myNormalBorderColor = "#DDDDDD"
+myNormalBorderColor = "#424242"
 myFocusedBorderColor :: String
-myFocusedBorderColor = "#FF0000"
+myFocusedBorderColor = "#007BFF"
 
 wallpaperImage :: FilePath
-wallpaperImage = "/home/fiendfan1/Theme Assets/andromeda_tilt_shift.jpg"
+wallpaperImage = homeDir ++ "/Theme Assets/haskell_pink.png"
 
 --------------------
 -- Keymap configs --
@@ -61,8 +72,8 @@ myKeys =
     ((myModMask, xK_b ), sendMessage ToggleStruts),
 
     -- Volume control.
-    ((myModMask, xK_u), spawn "amixer -c 1 set Master 2+"),
-    ((myModMask, xK_y), spawn "amixer -c 1 set Master 2-"),
+    ((myModMask, xK_u), spawn "amixer -D pulse set Master 2%+"),
+    ((myModMask, xK_y), spawn "amixer -D pulse set Master 2%-"),
 
     -- Vertical Resize ResizableTall windows.
     -- !!! These Override default keys !!!
@@ -88,7 +99,7 @@ myMouseBindings = []
 -- restarting (with 'mod-q') to reset your layout state to the new
 -- defaults, as xmonad preserves your old layout settings by default.
 -- !!!!!!!!!!!!!!
-myLayout = avoidStruts $ tallLayout ||| hybridLayout ||| Full
+myLayout = avoidStruts $ tallLayout {- ||| hybridLayout-} ||| Full
 
 -- | A tall layout where all windows on right
 --   side can be resized vertically.
@@ -146,7 +157,7 @@ myHandleEventHook =
 
 -- | Base dzen command.
 dzenBaseCommand :: String
-dzenBaseCommand = "dzen2 -fg '" ++ dzenForeground ++
+dzenBaseCommand = "dzen2 -dock -fg '" ++ dzenForeground ++
                 "' -bg '" ++ dzenBackground ++
                 "' -fn \"" ++ dzenFont ++ "\""
 
@@ -156,7 +167,7 @@ dzenBar = dzenBaseCommand ++ " -w '"++dzenSize++"' -x '0'"
 
 -- | Width of left dzen bar.
 dzenSizei :: Int
-dzenSizei = 600
+dzenSizei = 1024
 dzenSize :: String
 dzenSize = show dzenSizei
 
@@ -191,8 +202,8 @@ dzenLayout = dzenHidden
 
 dzenOutput :: Handle -> String -> IO ()
 dzenOutput outHandle xmonadLog = do
-    hPutStr outHandle
-        "^i(/home/fiendfan1/.xmonad/icons/images/arch_logo_mine.xbm)  |  "
+    hPutStr outHandle $
+        "^i(" ++ homeDir ++ "/.xmonad/icons/images/arch_logo_mine.xbm)  |  "
     hPutStrLn outHandle xmonadLog
 
 -- | A hook to transform log information.
@@ -220,12 +231,12 @@ myLogHook handle =
 -- | Start the conky bar with conkyConfig.
 startConkyBar :: IO ()
 startConkyBar = do
-    writeFile "/home/fiendfan1/.xmonad/.conky_dzen" conkyConfig
+    writeFile (homeDir ++ "/.xmonad/.conky_dzen") conkyConfig
     spawn conkyBar
 
 -- | Base conky command.
 conkyCommand :: String
-conkyCommand = "conky -c /home/fiendfan1/.xmonad/.conky_dzen"
+conkyCommand = "conky -c " ++ homeDir ++ "/.xmonad/.conky_dzen"
 
 -- | Command to start conky with output being
 --   directed to a new dzen bar.
@@ -233,9 +244,9 @@ conkyBar :: String
 conkyBar = conkyCommand ++ " | " ++
            dzenBaseCommand ++ " -w '"++conkySize++"' -x '"++dzenSize++"'"
 
--- | My screen is 1366px wide.
+-- | My screen is 1920px wide.
 conkySize :: String
-conkySize = show $ 1366 - dzenSizei
+conkySize = show $ 1920 - dzenSizei
 
 conkyConfig :: String
 conkyConfig =
@@ -246,34 +257,42 @@ conkyConfig =
     -- Begin content.
     "TEXT\n" ++
 
-    -- CPU usage display.
-    "^i(/home/fiendfan1/.xmonad/icons/images/cpu.xbm)  " ++
+    -- Volume display.
+    "^i(" ++ homeDir ++ "/.xmonad/icons/images/spkr_01.xbm)  " ++
+    "^fg(\\#0055FF)${exec amixer -D pulse get Master | " ++
+    "egrep -o [0-9]+% | head -n1}  " ++
+
+{-
+    -- Full Per-Core CPU usage display.
+    "^fg()|  ^i(" ++ homeDir ++ "/.xmonad/icons/images/cpu.xbm)  " ++
     "^fg(\\#FF0055)${cpu cpu1}% ${cpu cpu2}% " ++
-    "${cpu cpu3}% ${cpu cpu4}%^fg()  |  " ++
+    "${cpu cpu3}% ${cpu cpu4}% ${cpu cpu5}% ${cpu cpu6}% ${cpu cpu7}% ${cpu cpu8}%^fg()  |  " ++
+-}
+
+    -- Summary CPU usage display.
+    "^fg()|  ^i(" ++ homeDir ++ "/.xmonad/icons/images/cpu.xbm)  " ++
+    "^fg(\\#FF0055)${cpu}%^fg()  |  " ++
 
     -- RAM usage display.
-    "^i(/home/fiendfan1/.xmonad/icons/images/mem.xbm)  " ++
+    "^i(" ++ homeDir ++ "/.xmonad/icons/images/mem.xbm)  " ++
     "^fg(\\#55FF00)${mem} ^fg()  |  " ++
 
-    -- GPU usage display. I am using an AMD GPU.
-    "^i(/home/fiendfan1/.xmonad/icons/images/pacman.xbm)  " ++
+    -- GPU usage display. I am using an AMD GPU. TODO fix use open source driver
+    {-
+    "^i(" ++ homeDir ++ "/.xmonad/icons/images/pacman.xbm)  " ++
     "^fg(\\#D4FF00)${exec aticonfig --odgc --adapter=0" ++
     " | grep \"GPU load\" | egrep -o \"[0-9]+%\"}" ++
+    "^fg()  | " ++
+    -}
 
-    -- Volume display.
-    "^fg()  |  " ++
-    "^i(/home/fiendfan1/.xmonad/icons/images/spkr_01.xbm)  " ++
-    "^fg(\\#0055FF)${exec amixer -c 1 get Master " ++
-    "| grep \"Mono: Playback\" | egrep -o \"[0-9]+%\"}  " ++
-
-    -- Battery display.
-    "^fg()  |  ^i(/home/fiendfan1/.xmonad/icons/images/battery.xbm)  " ++
-    "^fg(\\#FF0055)" ++
-    "${exec bash /home/fiendfan1/.xmonad/scripts/battery_percent.sh}" ++
+    -- CPU temp display.
+    "^i(" ++ homeDir ++ "/.xmonad/icons/images/temp.xbm)  " ++
+    "^fg(\\#FF0055)${exec sensors | grep temp1 | egrep -o \"[0-9.]+°C\" " ++
+    "| head -n1} ^fg()  |  " ++
 
     -- Time display.
-    "^fg()  |  ^i(/home/fiendfan1/.xmonad/icons/stlarch/clock1.xbm)  " ++
-    "^fg(\\#55FF00)${time %l:%M %p}" ++
+    "^i(" ++ homeDir ++ "/.xmonad/icons/stlarch/clock1.xbm)  " ++
+    "^fg(\\#0055FF)${time %l:%M %p}" ++
     "\n"
 
 ------------------
@@ -284,12 +303,17 @@ conkyConfig =
 --   with mod-q.
 myStartupHook :: X ()
 myStartupHook = do
+    setWMName "LG3D"
     io $ setWallpaper wallpaperImage
+    --io comptonStart
+
+-- | Start compton with config file.
+comptonStart :: IO ()
+comptonStart = spawn $ "compton --config " ++ homeDir ++ "/.compton.conf"
 
 -- | Set wallpaper.
 setWallpaper :: FilePath -> IO ()
-setWallpaper file =
-        spawn $ "feh --bg-fill \""++file++"\""
+setWallpaper file = spawn $ "feh --bg-fill \""++file++"\""
 
 ----------
 -- Main --
@@ -316,6 +340,6 @@ myConfig barHandle = def {
     manageHook         = myManageHook,
     logHook            = myLogHook barHandle,
     startupHook        = myStartupHook,
-    handleEventHook    = docksEventHook
+    handleEventHook    = myHandleEventHook
     } `additionalKeys` myKeys
       `additionalMouseBindings` myMouseBindings

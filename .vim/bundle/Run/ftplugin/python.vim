@@ -1,1 +1,0 @@
-command! Run execute "!python %"
